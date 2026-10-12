@@ -9,7 +9,6 @@ import com.anurag.aiml.UserRepository;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:5173")
 public class UserController {
     private final UserRepository repository;
 

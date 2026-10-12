@@ -10,7 +10,6 @@ import com.anurag.aiml.ShopOrderRepository;
 
 @RestController
 @RequestMapping("/api/orders")
-@CrossOrigin(origins = "http://localhost:5173")
 public class ShopOrderController {
     private final ShopOrderRepository repository;
 
