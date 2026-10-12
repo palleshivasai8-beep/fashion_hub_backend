@@ -57,7 +57,7 @@ public class DatabaseConfig {
                         if (rawUserInfo != null) {
                             int separator = rawUserInfo.indexOf(':');
                             String encodedUsername = separator < 0
-                                    ? rawUserInfo
+                                     ? rawUserInfo
                                     : rawUserInfo.substring(0, separator);
                             username = decodeUserInfo(encodedUsername);
                             if (separator >= 0) {
@@ -80,12 +80,54 @@ public class DatabaseConfig {
                         return ds;
                     } catch (Exception e) {
                         throw new IllegalStateException(
-                                "Unable to configure PostgreSQL from DATABASE_URL; verify its format and credentials");
+                                "Unable to configure PostgreSQL from DATABASE_URL; verify its format and credentials", e);
+                    }
+                }
+
+                if (databaseUrl.startsWith("mysql://")) {
+                    try {
+                        URI uri = new URI(databaseUrl);
+                        if (!StringUtils.hasText(uri.getHost())
+                                || !StringUtils.hasText(uri.getRawPath())
+                                || uri.getRawPath().length() < 2) {
+                            throw new IllegalArgumentException("Database URL must include a host and database name");
+                        }
+
+                        String username = defaultUsername;
+                        String password = defaultPassword;
+                        String rawUserInfo = uri.getRawUserInfo();
+                        if (rawUserInfo != null) {
+                            int separator = rawUserInfo.indexOf(':');
+                            String encodedUsername = separator < 0
+                                    ? rawUserInfo
+                                    : rawUserInfo.substring(0, separator);
+                            username = decodeUserInfo(encodedUsername);
+                            if (separator >= 0) {
+                                password = decodeUserInfo(rawUserInfo.substring(separator + 1));
+                            }
+                        }
+
+                        int port = uri.getPort() == -1 ? 3306 : uri.getPort();
+                        String databaseName = uri.getRawPath().substring(1);
+                        String jdbcUrl = "jdbc:mysql://" + uri.getHost() + ":" + port + "/" + databaseName;
+                        if (uri.getRawQuery() != null && !uri.getRawQuery().isBlank()) {
+                            jdbcUrl += "?" + uri.getRawQuery();
+                        }
+
+                        HikariDataSource ds = new HikariDataSource();
+                        ds.setJdbcUrl(jdbcUrl);
+                        ds.setUsername(username);
+                        ds.setPassword(password);
+                        ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
+                        return ds;
+                    } catch (Exception e) {
+                        throw new IllegalStateException(
+                                "Unable to configure MySQL from DATABASE_URL; verify its format and credentials", e);
                     }
                 }
 
                 throw new IllegalStateException(
-                        "DATABASE_URL must be a JDBC URL or a postgres:// / postgresql:// URL");
+                        "DATABASE_URL must be a JDBC URL, mysql:// URL, or postgres:// / postgresql:// URL");
             }
         }
 
