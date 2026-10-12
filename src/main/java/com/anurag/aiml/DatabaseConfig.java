@@ -28,35 +28,52 @@ public class DatabaseConfig {
         String springDatasourceUrl = System.getenv("SPRING_DATASOURCE_URL");
         if (!StringUtils.hasText(springDatasourceUrl)) {
             String databaseUrl = System.getenv("DATABASE_URL");
-            if (StringUtils.hasText(databaseUrl) && (databaseUrl.startsWith("postgres://") || databaseUrl.startsWith("postgresql://"))) {
-                try {
-                    URI uri = new URI(databaseUrl);
-                    String userInfo = uri.getUserInfo();
-                    String username = defaultUsername;
-                    String password = defaultPassword;
-                    if (userInfo != null && userInfo.contains(":")) {
-                        String[] parts = userInfo.split(":", 2);
-                        username = parts[0];
-                        password = parts[1];
-                    }
-                    int port = uri.getPort() == -1 ? 5432 : uri.getPort();
-                    String path = uri.getPath();
-                    if (path != null && path.startsWith("/")) {
-                        path = path.substring(1);
-                    }
-                    String jdbcUrl = "jdbc:postgresql://" + uri.getHost() + ":" + port + "/" + path;
-                    if (uri.getQuery() != null) {
-                        jdbcUrl += "?" + uri.getQuery();
-                    }
-
+            if (StringUtils.hasText(databaseUrl)) {
+                if (databaseUrl.startsWith("jdbc:")) {
                     HikariDataSource ds = new HikariDataSource();
-                    ds.setJdbcUrl(jdbcUrl);
-                    ds.setUsername(username);
-                    ds.setPassword(password);
-                    ds.setDriverClassName("org.postgresql.Driver");
+                    ds.setJdbcUrl(databaseUrl);
+                    ds.setUsername(defaultUsername);
+                    ds.setPassword(defaultPassword);
+                    if (databaseUrl.startsWith("jdbc:postgresql:")) {
+                        ds.setDriverClassName("org.postgresql.Driver");
+                    } else if (databaseUrl.startsWith("jdbc:mysql:")) {
+                        ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
+                    }
                     return ds;
-                } catch (Exception e) {
-                    System.err.println("Failed to parse DATABASE_URL, using default configuration: " + e.getMessage());
+                } else if (databaseUrl.startsWith("postgres://") || databaseUrl.startsWith("postgresql://")) {
+                    try {
+                        URI uri = new URI(databaseUrl);
+                        String userInfo = uri.getUserInfo();
+                        String username = defaultUsername;
+                        String password = defaultPassword;
+                        if (userInfo != null && userInfo.contains(":")) {
+                            String[] parts = userInfo.split(":", 2);
+                            if (parts.length > 0) {
+                                username = java.net.URLDecoder.decode(parts[0], java.nio.charset.StandardCharsets.UTF_8);
+                            }
+                            if (parts.length > 1) {
+                                password = java.net.URLDecoder.decode(parts[1], java.nio.charset.StandardCharsets.UTF_8);
+                            }
+                        }
+                        int port = uri.getPort() == -1 ? 5432 : uri.getPort();
+                        String path = uri.getPath();
+                        if (path != null && path.startsWith("/")) {
+                            path = path.substring(1);
+                        }
+                        String jdbcUrl = "jdbc:postgresql://" + uri.getHost() + ":" + port + "/" + path;
+                        if (uri.getQuery() != null && !uri.getQuery().isBlank()) {
+                            jdbcUrl += "?" + uri.getQuery();
+                        }
+
+                        HikariDataSource ds = new HikariDataSource();
+                        ds.setJdbcUrl(jdbcUrl);
+                        ds.setUsername(username);
+                        ds.setPassword(password);
+                        ds.setDriverClassName("org.postgresql.Driver");
+                        return ds;
+                    } catch (Exception e) {
+                        System.err.println("Failed to parse DATABASE_URL, using default configuration: " + e.getMessage());
+                    }
                 }
             }
         }
