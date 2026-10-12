@@ -1,27 +1,29 @@
-# Build stage
+# Multi-stage Docker build for Spring Boot on Render
 FROM eclipse-temurin:17-jdk-jammy AS build
 WORKDIR /app
 
-# Copy Maven wrapper and project configuration
+# Copy Maven wrapper and POM first for better layer caching
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
-RUN chmod +x ./mvnw
+RUN sed -i 's/\r$//' mvnw && chmod +x ./mvnw
 
-# Cache dependencies
+# Pre-fetch project dependencies
 RUN ./mvnw dependency:go-offline -B || true
 
-# Copy source and build jar
+# Copy project source and package the Spring Boot executable JAR
 COPY src ./src
 RUN ./mvnw clean package -DskipTests -B
 
-# Runtime stage
+# Lightweight JRE runtime stage
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
-# Copy packaged jar from build stage
-COPY --from=build /app/target/*.jar app.jar
+# Copy the built Spring Boot fat JAR from the builder stage
+COPY --from=build /app/target/FashionHub-0.0.1-SNAPSHOT.jar app.jar
 
+# Render automatically provides the PORT environment variable (defaults to 8081 locally)
 ENV PORT=8081
 EXPOSE 8081
 
-ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+# Optimize JVM startup memory and random seed generation for cloud containers
+ENTRYPOINT ["sh", "-c", "java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom -Dserver.port=${PORT} -jar app.jar"]
